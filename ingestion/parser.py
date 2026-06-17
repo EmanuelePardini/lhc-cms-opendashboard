@@ -145,15 +145,6 @@ class Muon:
         point (0,0,0) in the direction of the muon momentum. A real CMS
         track would include curvature from the 3.8 T solenoid field, but
         for visualisation purposes a line is sufficient.
-
-        Parameters
-        ----------
-        n_points:
-            Number of sample points along the track (more = smoother curve).
-
-        Returns
-        -------
-        list of {x, y, z} dicts (metres, scaled from detector geometry)
         """
         # CMS inner detector radius ≈ 1.1 m, forward ≈ 3 m
         # We scale the direction vector to detector dimensions
@@ -276,18 +267,6 @@ class DimuonCSVParser:
     """
     Parses a CMS dimuon CSV file (CERN Open Data format) into DimuonEvent
     objects and / or a pandas DataFrame.
-
-    The CSV schema is:
-        Run, Event,
-        Type1, E1, px1, py1, pz1, pt1, eta1, phi1, Q1,
-        Type2, E2, px2, py2, pz2, pt2, eta2, phi2, Q2,
-        M
-
-    Usage
-    -----
-    parser = DimuonCSVParser()
-    df = parser.to_dataframe("data/cache/dimuon_run2010b.csv")
-    events = parser.to_events("data/cache/dimuon_run2010b.csv", max_events=1000)
     """
 
     def __init__(
@@ -295,15 +274,7 @@ class DimuonCSVParser:
         mass_tolerance: float = 0.05,
         warn_on_mismatch: bool = True,
     ) -> None:
-        """
-        Parameters
-        ----------
-        mass_tolerance:
-            Fractional tolerance for invariant mass cross-check.
-            If |M_derived − M_csv| / M_csv > tolerance, log a warning.
-        warn_on_mismatch:
-            Whether to warn when the derived mass differs from the CSV value.
-        """
+
         self.mass_tolerance = mass_tolerance
         self.warn_on_mismatch = warn_on_mismatch
 
@@ -327,17 +298,6 @@ class DimuonCSVParser:
             any_global  — True if Type1 == 'G' or Type2 == 'G'
             in_accept   — True if both muons pass CMS acceptance cuts
             z_candidate — True if event is a Z boson candidate
-
-        Parameters
-        ----------
-        csv_path:
-            Path to the CMS dimuon CSV file.
-        max_rows:
-            If set, read only the first max_rows rows (useful for testing).
-
-        Returns
-        -------
-        pd.DataFrame
         """
         path = Path(csv_path)
         logger.info("Reading CSV: %s", path)
@@ -417,18 +377,7 @@ class DimuonCSVParser:
         Parse CSV into a list of DimuonEvent dataclass instances.
 
         This is lower-throughput than to_dataframe() but produces
-        fully-typed objects with 3-D track points for the WebSocket layer.
-
-        Parameters
-        ----------
-        csv_path:
-            Path to the CMS dimuon CSV file.
-        max_events:
-            Maximum number of events to parse (None = all).
-
-        Returns
-        -------
-        list[DimuonEvent]
+        fully-typed objects with 3-D track points.
         """
         df = self.to_dataframe(csv_path, max_rows=max_events)
         events: list[DimuonEvent] = []

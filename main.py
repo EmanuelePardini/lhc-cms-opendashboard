@@ -1,24 +1,23 @@
 """
 main.py
 -------
-Integration test and demo for the LHC Stream Platform ingestion layer.
+End-to-end integration test for the LHC Platform ingestion +
+analysis + persistence pipeline.
 
-Runs the full pipeline:
-    1. Download the CMS dimuon dataset (cached after first run)
-    2. Parse into a DataFrame
-    3. Print physics summary statistics
-    4. Parse a sample of events into DimuonEvent objects
-    5. Show a sample JSON payload (as the WebSocket will send it)
-    6. Show which events are Z boson candidates
+Pipeline stages tested
+----------------------
+1. Download  — fetch CMS dimuon CSV from CERN Open Data Portal (cached)
+2. Parse     — DimuonCSVParser → pandas DataFrame + DimuonEvent objects
+3. Analyse   — DimuonAnalysis  → cuts, histograms, Z peak fit
+4. Persist   — DimuonStore     → SQLite (events, histograms, run metadata)
+5. Query     — verify REST-style queries work against the stored data
+6. Report    — print physics results and JSON payload sample
 
-Run:
-    python main.py
-
-Run with larger dataset:
-    python main.py --dataset dimuon_run2011a
-
-Run without downloading (use cached file only):
-    python main.py --no-download
+Run
+---
+    python main.py                          # quick test, 100k event dataset
+    python main.py --dataset dimuon_run2011a  # full ~986k event run
+    python main.py --max-rows 5000          # fast smoke test
 """
 
 import argparse
@@ -28,228 +27,208 @@ import sys
 import time
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Add project root to path so imports work from any directory
-# ---------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from ingestion.downloader import CERNOpenDataDownloader, DATASETS
-from ingestion.parser import (
-    DimuonCSVParser,
-    Z_BOSON_MASS_GEV,
-    Z_WINDOW_LOW_GEV,
-    Z_WINDOW_HIGH_GEV,
-    MUON_MASS_GEV,
-)
+from ingestion.parser import DimuonCSVParser
+from pipeline.analysis import DimuonAnalysis, load_config
+from pipeline.store import DimuonStore
 
 # ---------------------------------------------------------------------------
-# Logging setup
+# Logging
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    format="%(asctime)s  %(levelname)-8s  %(name)-22s  %(message)s",
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("main")
 
-# ---------------------------------------------------------------------------
-# Separator helpers
-# ---------------------------------------------------------------------------
-SEP = "─" * 60
-
+SEP = "═" * 64
 
 def section(title: str) -> None:
     print(f"\n{SEP}")
     print(f"  {title}")
     print(SEP)
 
+def sub(label: str, value) -> None:
+    print(f"  {label:<36} {value}")
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="LHC Stream Platform — ingestion test")
-    parser.add_argument(
-        "--dataset",
-        default="dimuon_run2010b",
-        choices=list(DATASETS.keys()),
-        help="Dataset to use (default: dimuon_run2010b, ~100k events)",
-    )
-    parser.add_argument(
-        "--cache-dir",
-        default="data/cache",
-        help="Directory for cached CSV files",
-    )
-    parser.add_argument(
-        "--sample-events",
-        type=int,
-        default=5,
-        help="Number of DimuonEvent objects to print as JSON (default: 5)",
-    )
-    parser.add_argument(
-        "--max-rows",
-        type=int,
-        default=None,
-        help="Max rows to parse (None = all). Use e.g. 10000 for quick test.",
-    )
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser(description="LHC Open Dashboard — full pipeline test")
+    ap.add_argument("--dataset", default="dimuon_run2010b", choices=list(DATASETS.keys()))
+    ap.add_argument("--config", default="config/pipeline.yaml")
+    ap.add_argument("--max-rows", type=int, default=None,
+                    help="Limit rows parsed (None = all). Use 5000 for fast test.")
+    ap.add_argument("--stream-sample", type=int, default=3,
+                    help="Number of batches to print iter")
+    args = ap.parse_args()
 
-    # -----------------------------------------------------------------------
-    # 1. Dataset info
-    # -----------------------------------------------------------------------
-    section("Dataset")
-    info = DATASETS[args.dataset]
-    print(f"  Name        : {info.name}")
-    print(f"  Record      : opendata.cern.ch/record/{info.record_id}")
-    print(f"  DOI         : {info.doi}")
-    print(f"  Description : {info.description}")
-    print(f"  ~Events     : {info.n_events_approx:,}")
+    t_total = time.perf_counter()
 
-    # -----------------------------------------------------------------------
-    # 2. Download
-    # -----------------------------------------------------------------------
-    section("Download")
-    downloader = CERNOpenDataDownloader(cache_dir=args.cache_dir)
+    # 0. Config
+    section("0 · Configuration")
+    cfg = load_config(args.config)
+    sub("Dataset", args.dataset)
+    sub("Config file", args.config)
+    sub("Max rows", args.max_rows or "all")
+    sub("pT_min [GeV]", cfg["cuts"]["pt_min_gev"])
+    sub("|η|_max", cfg["cuts"]["eta_max"])
+    sub("Z window [GeV]", f"{cfg['cuts']['z_window_low_gev']}–{cfg['cuts']['z_window_high_gev']}")
+    sub("ΔR_min", cfg["cuts"]["delta_r_min"])
+    sub("DB path", cfg["storage"]["db_path"])
 
-    # List all datasets
-    for ds in downloader.list_datasets():
-        status = "✓ cached" if ds["cached"] else "  not cached"
-        print(f"  [{status}]  {ds['name']}  (~{ds['n_events_approx']:,} events)")
+    # Override max_rows from CLI if provided
+    if args.max_rows:
+        cfg["ingestion"]["max_rows"] = args.max_rows
 
+    # 1. Download
+    section("1 · Download")
+    downloader = CERNOpenDataDownloader(cache_dir=cfg["ingestion"]["cache_dir"])
     t0 = time.perf_counter()
     csv_path = downloader.get(args.dataset)
+    sub("CSV path", csv_path)
+    sub("File size", f"{csv_path.stat().st_size / 1024 / 1024:.1f} MB")
+    sub("Time", f"{time.perf_counter() - t0:.2f}s")
+
+    # 2. Parse
+    section("2 · Parse")
+    parser = DimuonCSVParser()
+    t0 = time.perf_counter()
+    df = parser.to_dataframe(csv_path, max_rows=cfg["ingestion"].get("max_rows"))
+    elapsed = time.perf_counter() - t0
+    sub("Rows parsed", f"{len(df):,}")
+    sub("Columns", len(df.columns))
+    sub("Time", f"{elapsed:.2f}s  ({len(df)/elapsed:,.0f} rows/s)")
+    sub("M range [GeV]", f"{df['M'].min():.3f} – {df['M'].max():.3f}")
+    sub("Mean pT1 [GeV/c]", f"{df['pt1'].mean():.3f}")
+    sub("Opp-sign pairs", f"{(df['Q1']*df['Q2']==-1).sum():,}")
+
+    # 3. Analyse
+    section("3 · Analysis")
+    analysis = DimuonAnalysis(cfg)
+    t0 = time.perf_counter()
+    result = analysis.run(df)
     elapsed = time.perf_counter() - t0
 
-    size_mb = csv_path.stat().st_size / 1024 / 1024
-    print(f"\n  File   : {csv_path}")
-    print(f"  Size   : {size_mb:.1f} MB")
-    print(f"  Time   : {elapsed:.2f}s")
+    cs = result.cut_summary
+    sub("Time", f"{elapsed:.2f}s")
+    print()
+    print("  Cut flow:")
+    print(f"    {'Input':<30} {cs.total_input:>8,}")
+    print(f"    {'After acceptance':<30} {cs.after_acceptance:>8,}  "
+          f"({cs.after_acceptance/cs.total_input*100:.1f}%)")
+    print(f"    {'After opposite-sign':<30} {cs.after_opposite_sign:>8,}  "
+          f"({cs.after_opposite_sign/cs.total_input*100:.1f}%)")
+    print(f"    {'After global muon':<30} {cs.after_global_muon:>8,}  "
+          f"({cs.after_global_muon/cs.total_input*100:.1f}%)")
+    print(f"    {'After ΔR > ' + str(cfg['cuts']['delta_r_min']):<30} {cs.after_delta_r:>8,}  "
+          f"({cs.after_delta_r/cs.total_input*100:.1f}%)")
+    print(f"    {'Z candidates (mass window)':<30} {cs.after_z_window:>8,}  "
+          f"({cs.after_z_window/cs.total_input*100:.1f}%)")
 
-    # -----------------------------------------------------------------------
-    # 3. Parse into DataFrame
-    # -----------------------------------------------------------------------
-    section("DataFrame Parse")
-    csv_parser = DimuonCSVParser(mass_tolerance=0.05)
+    if result.z_peak_fit:
+        fit = result.z_peak_fit
+        print()
+        print("  Z peak fit (Gaussian):")
+        sub("  Measured M_Z", f"{fit.mean_gev:.3f} GeV")
+        sub("  PDG M_Z", f"{fit.pdg_mean_gev:.3f} GeV")
+        sub("  Deviation", f"{fit.deviation_from_pdg_gev:+.3f} GeV")
+        sub("  σ (fitted width)", f"{fit.sigma_gev:.3f} GeV")
+        if fit.chi2_ndf:
+            sub("  χ²/NDF", f"{fit.chi2_ndf:.3f}")
+
+    # Terminal mass histogram
+    print()
+    print("  Mass spectrum (all passing cuts):")
+    hist = result.mass_histogram
+    centers = hist.bin_centers
+    counts = hist.counts
+    max_c = max(counts) if counts else 1
+    # Print every 5th bin for readability
+    print(f"  {'M [GeV]':>10}  {'N':>7}  bar")
+    for i in range(0, len(centers), max(1, len(centers)//20)):
+        bar = "█" * int(counts[i] / max_c * 30)
+        print(f"  {centers[i]:>10.1f}  {counts[i]:>7,}  {bar}")
+
+    # 4. Persist
+    section("4 · Persist to SQLite")
+    store = DimuonStore(cfg["storage"]["db_path"])
+    t0 = time.perf_counter()
+    run_id = store.save_analysis(
+        result,
+        dataset_name=args.dataset,
+        recreate=cfg["storage"].get("recreate_on_run", True),
+    )
+    elapsed = time.perf_counter() - t0
+    sub("run_id", run_id)
+    sub("DB path", cfg["storage"]["db_path"])
+    sub("DB size", f"{Path(cfg['storage']['db_path']).stat().st_size / 1024 / 1024:.2f} MB")
+    sub("Time", f"{elapsed:.2f}s")
+
+    # 5. Query — verify REST-style access
+    section("5 · Query (REST simulation)")
+
+    # All events, paginated
+    t0 = time.perf_counter()
+    events_page = store.query_events(limit=10, offset=0)
+    sub("GET /events?limit=10", f"{len(events_page)} rows  ({(time.perf_counter()-t0)*1000:.1f}ms)")
+
+    # Z candidates only
+    t0 = time.perf_counter()
+    z_page = store.query_events(z_candidate=True, limit=10)
+    sub("GET /events?z_candidate=true", f"{len(z_page)} rows  ({(time.perf_counter()-t0)*1000:.1f}ms)")
+
+    # Mass range filter
+    t0 = time.perf_counter()
+    mass_range = store.query_events(mass_min=85.0, mass_max=97.0, limit=100)
+    sub("GET /events?mass_min=85&mass_max=97", f"{len(mass_range)} rows  ({(time.perf_counter()-t0)*1000:.1f}ms)")
+
+    # Histograms
+    t0 = time.perf_counter()
+    mass_hist_dict = store.get_histogram("mass_spectrum")
+    sub("GET /histogram/mass", f"{len(mass_hist_dict['counts'])} bins  ({(time.perf_counter()-t0)*1000:.1f}ms)")
 
     t0 = time.perf_counter()
-    df = csv_parser.to_dataframe(csv_path, max_rows=args.max_rows)
-    elapsed = time.perf_counter() - t0
+    z_hist_dict = store.get_histogram("z_peak")
+    sub("GET /histogram/z_peak", f"{len(z_hist_dict['counts'])} bins  ({(time.perf_counter()-t0)*1000:.1f}ms)")
 
-    print(f"\n  Parsed {len(df):,} rows in {elapsed:.2f}s")
-    print(f"  Columns: {list(df.columns)}")
+    # Stats
+    t0 = time.perf_counter()
+    stats = store.get_stats()
+    sub("GET /stats", f"({(time.perf_counter()-t0)*1000:.1f}ms)")
+    print()
+    for k, v in stats.items():
+        print(f"    {k:<30} {v}")
 
-    # -----------------------------------------------------------------------
-    # 4. Physics summary
-    # -----------------------------------------------------------------------
-    section("Physics Summary")
-    summary = csv_parser.summary(df)
-
-    print(f"  Total events          : {summary['total_events']:,}")
-    print(f"  Opposite-sign pairs   : {summary['opposite_sign_events']:,}")
-    print(f"  Z candidates          : {summary['z_candidates']:,}")
-    print(f"  Mean invariant mass   : {summary['mass_mean_gev']:.3f} GeV")
-    print(f"  Std  invariant mass   : {summary['mass_std_gev']:.3f} GeV")
-    if summary["mass_z_peak_mean_gev"]:
-        print(f"  Z peak mean mass      : {summary['mass_z_peak_mean_gev']:.3f} GeV  "
-              f"(PDG: {Z_BOSON_MASS_GEV:.3f} GeV)")
-        deviation = abs(summary['mass_z_peak_mean_gev'] - Z_BOSON_MASS_GEV)
-        print(f"  Deviation from PDG    : {deviation:.3f} GeV")
-    print(f"  Mean pT (muon 1)      : {summary['pt1_mean_gev']:.3f} GeV/c")
-    print(f"  Mean pT (muon 2)      : {summary['pt2_mean_gev']:.3f} GeV/c")
-    print(f"  Global muon fraction  : {summary['global_muon_fraction']*100:.1f}%")
+    # Run metadata
+    run_meta = store.get_latest_run()
+    print()
+    sub("Latest run timestamp", run_meta["timestamp"])
+    sub("Latest run dataset", run_meta["dataset"])
 
     # -----------------------------------------------------------------------
-    # 5. Mass spectrum bins (rough histogram for terminal)
+    # 6. Report
     # -----------------------------------------------------------------------
-    section("Invariant Mass Spectrum (terminal histogram)")
+    section("6 · Summary")
+    total_time = time.perf_counter() - t_total
+    sub("Total wall time", f"{total_time:.2f}s")
+    sub("Events processed", f"{cs.total_input:,}")
+    sub("Events/second", f"{cs.total_input / total_time:,.0f}")
+    sub("Z candidates found", f"{cs.after_z_window:,}")
+    sub("DB written to", cfg["storage"]["db_path"])
+    if result.z_peak_fit:
+        sub("Measured M_Z", f"{result.z_peak_fit.mean_gev:.3f} GeV  "
+            f"(PDG: {result.z_peak_fit.pdg_mean_gev:.3f} GeV)")
 
-    z_df = df[df["z_candidate"]]
-    bins = [
-        (0, 5, "η/ω resonances"),
-        (5, 15, "Υ(upsilon) family"),
-        (15, 40, "below Z (Drell-Yan)"),
-        (40, 76, "off-peak region"),
-        (76, 106, f"Z window ({Z_WINDOW_LOW_GEV}–{Z_WINDOW_HIGH_GEV} GeV)"),
-        (106, 200, "above Z"),
-    ]
-
-    max_count = max(
-        ((df["M"] >= lo) & (df["M"] < hi)).sum() for lo, hi, _ in bins
-    )
-
-    print(f"  {'Range':>10}  {'N':>8}  {'Bar':30}  Label")
-    for lo, hi, label in bins:
-        mask = (df["M"] >= lo) & (df["M"] < hi)
-        n = mask.sum()
-        bar_len = int(n / max_count * 28)
-        bar = "█" * bar_len
-        print(f"  {lo:>4}–{hi:<4} GeV  {n:>8,}  {bar:<28}  {label}")
-
-    # -----------------------------------------------------------------------
-    # 6. Sample DimuonEvent objects → JSON (WebSocket payload preview)
-    # -----------------------------------------------------------------------
-    section(f"Sample DimuonEvent JSON (first {args.sample_events} events)")
-    events = csv_parser.to_events(csv_path, max_events=args.sample_events)
-
-    for i, ev in enumerate(events):
-        payload = ev.to_dict()
-        print(f"\n  Event {i+1}/{args.sample_events}  "
-              f"(Run {ev.run}, Event {ev.event})")
-        print(f"    M            = {payload['invariant_mass']:.4f} GeV")
-        print(f"    ΔR           = {payload['delta_r']:.4f}")
-        print(f"    Opp sign     = {payload['is_opposite_sign']}")
-        print(f"    Z candidate  = {payload['is_z_candidate']}")
-        print(f"    Muon 1 type  = {payload['muon1']['type']}  "
-              f"pT={payload['muon1']['pt']:.2f} GeV  "
-              f"η={payload['muon1']['eta']:.3f}  "
-              f"Q={payload['muon1']['charge']:+d}")
-        print(f"    Muon 2 type  = {payload['muon2']['type']}  "
-              f"pT={payload['muon2']['pt']:.2f} GeV  "
-              f"η={payload['muon2']['eta']:.3f}  "
-              f"Q={payload['muon2']['charge']:+d}")
-
-        # Show first 3 track points for each muon
-        t1 = payload["muon1"]["tracks"][:3]
-        t2 = payload["muon2"]["tracks"][:3]
-        print(f"    Track1[0:3]  = {t1}")
-        print(f"    Track2[0:3]  = {t2}")
-
-    # Full JSON of event 1
-    print(f"\n  Full JSON payload for event 1:")
-    payload0 = events[0].to_dict()
-    # Truncate track points for readability
-    payload0["muon1"]["tracks"] = payload0["muon1"]["tracks"][:3] + [{"...": "..."}]
-    payload0["muon2"]["tracks"] = payload0["muon2"]["tracks"][:3] + [{"...": "..."}]
-    print(json.dumps(payload0, indent=4))
-
-    # -----------------------------------------------------------------------
-    # 7. Z candidate sample
-    # -----------------------------------------------------------------------
-    section("Z Boson Candidate Events")
-    z_events = csv_parser.to_events(csv_path, max_events=5000)
-    z_candidates = [e for e in z_events if e.is_z_candidate]
-
-    print(f"\n  Z candidates in first 5000 events: {len(z_candidates)}")
-    print(f"  (Expected ~{int(5000 * summary['z_candidates'] / summary['total_events'])} "
-          f"based on full dataset fraction)")
-
-    if z_candidates:
-        print(f"\n  Top 5 Z candidates by invariant mass:")
-        top5 = sorted(z_candidates, key=lambda e: e.invariant_mass, reverse=True)[:5]
-        for ev in top5:
-            print(f"    Run={ev.run}  Event={ev.event}  "
-                  f"M={ev.invariant_mass:.4f} GeV  "
-                  f"ΔR={ev.delta_r:.3f}")
-
-    # -----------------------------------------------------------------------
-    # Done
-    # -----------------------------------------------------------------------
-    section("All checks passed ✓")
-    print(f"\n  Ingestion layer is working correctly.")
-    print(f"  Next step: implement pipeline/analysis.py")
-    print(f"             → compute Z peak, apply configurable cuts")
+    print()
+    print("  All stages passed ✓")
+    print("  Next: implement backend/main.py (FastAPI)")
     print()
 
 

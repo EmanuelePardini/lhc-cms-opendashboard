@@ -107,11 +107,6 @@ class CERNOpenDataDownloader:
     """
     Downloads CMS dimuon CSV files from the CERN Open Data Portal with
     resumable download support, SHA-256 integrity check, and local caching.
-
-    Usage
-    -----
-    downloader = CERNOpenDataDownloader(cache_dir="data/cache")
-    path = downloader.get("dimuon_run2010b")   # returns Path to local file
     """
 
     CHUNK_SIZE = 1024 * 256  # 256 KB per chunk
@@ -127,25 +122,6 @@ class CERNOpenDataDownloader:
     def get(self, dataset_name: str = DEFAULT_DATASET) -> Path:
         """
         Return the local path to the dataset CSV, downloading if necessary.
-
-        Parameters
-        ----------
-        dataset_name:
-            Key in DATASETS registry (e.g. "dimuon_run2010b").
-
-        Returns
-        -------
-        Path
-            Absolute path to the cached CSV file.
-
-        Raises
-        ------
-        KeyError
-            If dataset_name is not in the registry.
-        requests.HTTPError
-            If the download fails with a non-2xx status.
-        ValueError
-            If the downloaded file fails the SHA-256 integrity check.
         """
         if dataset_name not in DATASETS:
             available = list(DATASETS.keys())

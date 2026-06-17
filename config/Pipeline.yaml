@@ -1,0 +1,54 @@
+# LHC Stream Platform — Pipeline Configuration
+# All analysis parameters live here. Restart the service to apply changes.
+# No code modifications required.
+
+ingestion:
+  dataset: "dimuon_run2010b"   # dimuon_run2010b | dimuon_run2011a
+  cache_dir: "data/cache"
+  max_rows: null               # null = all rows; set integer for quick tests
+
+cuts:
+  # Transverse momentum minimum [GeV/c]
+  # CMS Run2010B selection already requires reasonable pT; this is a
+  # further analysis-level cut. Standard Z analyses use pT > 20 GeV
+  # for the leading muon, but 3 GeV keeps more events for education use.
+  pt_min_gev: 3.0
+
+  # Pseudorapidity acceptance window |η| < eta_max
+  # CMS muon system covers |η| < 2.4. Values above 2.4 are outside the
+  # detector acceptance and should never appear in this dataset.
+  eta_max: 2.4
+
+  # Require opposite-sign muon pair (charge Q1 * Q2 == -1)
+  # Essential for Z→μμ selection; same-sign pairs are background.
+  require_opposite_sign: true
+
+  # Require at least one global muon (Type == 'G')
+  # Global muons have the best momentum resolution; required for Z analyses.
+  require_global_muon: true
+
+  # Invariant mass window [GeV/c²] for Z boson candidate tagging
+  # PDG Z mass: 91.188 ± 0.002 GeV, width Γ_Z: 2.495 GeV
+  # ±15 GeV window around M_Z covers ~6 natural widths on each side
+  z_window_low_gev: 76.0
+  z_window_high_gev: 106.0
+
+  # Minimum ΔR angular separation between the two muons
+  # Prevents double-counting from split tracks; standard cut: ΔR > 0.3
+  delta_r_min: 0.3
+
+histogram:
+  # Invariant mass histogram configuration
+  mass_min_gev: 2.0
+  mass_max_gev: 120.0
+  n_bins: 100
+
+  # Additional fine-grained Z peak histogram
+  z_peak_min_gev: 70.0
+  z_peak_max_gev: 110.0
+  z_peak_bins: 80
+
+storage:
+  db_path: "data/processed/events.db"
+  # Recreate tables on each pipeline run (true) or append (false)
+  recreate_on_run: true
