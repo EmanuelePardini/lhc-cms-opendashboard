@@ -1,6 +1,4 @@
 """
-parser.py
----------
 Parses CMS dimuon CSV files into structured DimuonEvent objects and
 pandas DataFrames ready for the analysis pipeline.
 
@@ -79,10 +77,6 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 MUON_MASS_GEV: float = 0.10566   # GeV/c²  (PDG 2022)
 Z_BOSON_MASS_GEV: float = 91.188  # GeV/c²  (PDG 2022)
 Z_BOSON_WIDTH_GEV: float = 2.495  # GeV     (PDG 2022)
@@ -103,10 +97,6 @@ EXPECTED_COLUMNS: list[str] = [
     "M",
 ]
 
-
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
 
 @dataclass
 class Muon:
@@ -259,10 +249,6 @@ class DimuonEvent:
         }
 
 
-# ---------------------------------------------------------------------------
-# Parser
-# ---------------------------------------------------------------------------
-
 class DimuonCSVParser:
     """
     Parses a CMS dimuon CSV file (CERN Open Data format) into DimuonEvent
@@ -277,10 +263,6 @@ class DimuonCSVParser:
 
         self.mass_tolerance = mass_tolerance
         self.warn_on_mismatch = warn_on_mismatch
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def to_dataframe(
         self,
@@ -425,10 +407,6 @@ class DimuonCSVParser:
                 float((df["Type1"] == "G").mean() + (df["Type2"] == "G").mean()) / 2, 3
             ),
         }
-
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
 
     def _validate_columns(self, df: pd.DataFrame) -> None:
         missing = [c for c in EXPECTED_COLUMNS if c not in df.columns]

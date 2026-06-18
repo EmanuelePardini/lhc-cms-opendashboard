@@ -1,11 +1,8 @@
-# LHC Stream Platform — Pipeline Configuration
-# All analysis parameters live here. Restart the service to apply changes.
-# No code modifications required.
 
 ingestion:
-  dataset: "dimuon_run2010b"   # dimuon_run2010b | dimuon_run2011a
+  dataset: "dimuon_run2010b"
   cache_dir: "data/cache"
-  max_rows: null               # null = all rows; set integer for quick tests
+  max_rows: null 
 
 cuts:
   # Transverse momentum minimum [GeV/c]

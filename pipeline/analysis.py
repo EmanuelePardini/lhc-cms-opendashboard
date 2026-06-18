@@ -167,11 +167,6 @@ class AnalysisResult:
             d["processed_records"] = self.processed_df.to_dict(orient="records")
         return d
 
-
-# ---------------------------------------------------------------------------
-# Analysis pipeline
-# ---------------------------------------------------------------------------
-
 class DimuonAnalysis:
     """
     Applies kinematic selection cuts, computes histograms, and fits the
@@ -185,10 +180,6 @@ class DimuonAnalysis:
         self.cfg = config
         self.cuts = config["cuts"]
         self.hist_cfg = config["histogram"]
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def run(self, df: pd.DataFrame) -> AnalysisResult:
         """

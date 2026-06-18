@@ -1,25 +1,3 @@
-"""
-main.py
--------
-End-to-end integration test for the LHC Platform ingestion +
-analysis + persistence pipeline.
-
-Pipeline stages tested
-----------------------
-1. Download  — fetch CMS dimuon CSV from CERN Open Data Portal (cached)
-2. Parse     — DimuonCSVParser → pandas DataFrame + DimuonEvent objects
-3. Analyse   — DimuonAnalysis  → cuts, histograms, Z peak fit
-4. Persist   — DimuonStore     → SQLite (events, histograms, run metadata)
-5. Query     — verify REST-style queries work against the stored data
-6. Report    — print physics results and JSON payload sample
-
-Run
----
-    python main.py                          # quick test, 100k event dataset
-    python main.py --dataset dimuon_run2011a  # full ~986k event run
-    python main.py --max-rows 5000          # fast smoke test
-"""
-
 import argparse
 import json
 import logging
@@ -35,9 +13,6 @@ from ingestion.parser import DimuonCSVParser
 from pipeline.analysis import DimuonAnalysis, load_config
 from pipeline.store import DimuonStore
 
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)-22s  %(message)s",
@@ -55,9 +30,7 @@ def section(title: str) -> None:
 def sub(label: str, value) -> None:
     print(f"  {label:<36} {value}")
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="LHC Open Dashboard — full pipeline test")
@@ -212,9 +185,6 @@ def main() -> None:
     sub("Latest run timestamp", run_meta["timestamp"])
     sub("Latest run dataset", run_meta["dataset"])
 
-    # -----------------------------------------------------------------------
-    # 6. Report
-    # -----------------------------------------------------------------------
     section("6 · Summary")
     total_time = time.perf_counter() - t_total
     sub("Total wall time", f"{total_time:.2f}s")

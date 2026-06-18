@@ -1,6 +1,4 @@
 """
-downloader.py
--------------
 Downloads CMS dimuon CSV datasets from the CERN Open Data Portal.
 
 Dataset used:
@@ -50,9 +48,6 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Dataset registry
-# ---------------------------------------------------------------------------
 
 @dataclass
 class DatasetInfo:
@@ -99,10 +94,6 @@ DATASETS: dict[str, DatasetInfo] = {
 DEFAULT_DATASET = "dimuon_run2010b"
 
 
-# ---------------------------------------------------------------------------
-# Downloader
-# ---------------------------------------------------------------------------
-
 class CERNOpenDataDownloader:
     """
     Downloads CMS dimuon CSV files from the CERN Open Data Portal with
@@ -114,10 +105,6 @@ class CERNOpenDataDownloader:
     def __init__(self, cache_dir: Path = "data/cache") -> None:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def get(self, dataset_name: str = DEFAULT_DATASET) -> Path:
         """
@@ -184,10 +171,6 @@ class CERNOpenDataDownloader:
             for f in self.cache_dir.glob("*.csv"):
                 f.unlink()
                 logger.info("Purged: %s", f)
-
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
 
     def _download(self, url: str, dest: Path) -> None:
         """Stream-download url to dest with a .part temporary file."""
