@@ -1,6 +1,4 @@
 """
-store.py
---------
 SQLite persistence layer for processed dimuon events and analysis results.
 
 Stores:
