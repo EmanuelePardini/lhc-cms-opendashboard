@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { MOCK_EVENTS, MOCK_STATS } from "../constants/mock";
 
-export const API_BASE = "http://localhost:8000";
+export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const PAGE_SIZE = 20;
 
 export function useEvents() {
