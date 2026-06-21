@@ -4,6 +4,7 @@ from backend.app.dependencies import get_store, get_config
 from backend.app.schemas import HistogramResponse, PipelineStatsResponse
 from pipeline.store import DimuonStore
 
+
 router = APIRouter(tags=["Analysis Engine"])
 
 
@@ -25,17 +26,22 @@ def get_invariant_mass_histogram(store: DimuonStore = Depends(get_store)):
 
 
 @router.get("/stats", response_model=PipelineStatsResponse)
-def get_aggregated_pipeline_statistics(store: DimuonStore = Depends(get_store)):
-    """Computes aggregate physics distributions and framework latency diagnostics for the current dataset run."""
-    stats = store.get_stats()
+def get_aggregated_pipeline_statistics(
+    dataset_id: int = None,
+    store: DimuonStore = Depends(get_store)
+):
+    """Computes aggregate physics distributions for the currently specified dataset ID."""
+    stats = store.get_stats(dataset_id=dataset_id)
     if not stats:
-        raise HTTPException(status_code=404, detail="No analytical summaries are present inside the database schema.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No analytical summaries are present inside the database schema for dataset ID: {dataset_id or 'any'}"
+        )
 
-    latest_run = store.get_latest_run()
+    latest_run = store.get_latest_run(dataset_id=dataset_id)
     trigger_rate = None
     latency = None
 
-    # Safely extract optional performance telemetry inside run summaries if configured
     if latest_run and latest_run.get("cut_summary_json"):
         summary = latest_run["cut_summary_json"]
         trigger_rate = summary.get("trigger_rate_hz", None)

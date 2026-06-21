@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.app.routers import events, analysis
+from backend.app.routers import events, analysis, datasets
 
 app = FastAPI(
     title="LHC Open Dashboard - API Engine",
@@ -20,3 +20,4 @@ app.add_middleware(
 # Route mounting
 app.include_router(events.router)
 app.include_router(analysis.router)
+app.include_router(datasets.router)

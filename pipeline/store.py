@@ -172,7 +172,7 @@ class DimuonStore:
         self,
         result: AnalysisResult,
         dataset_name: str,
-        recreate: bool = True,
+        recreate: bool = False,
     ) -> int:
         """
         Persist a full AnalysisResult to SQLite.
@@ -323,12 +323,18 @@ class DimuonStore:
             return None
         return json.loads(row["data_json"])
 
-    def get_latest_run(self) -> dict | None:
-        """Return metadata for the most recent analysis run."""
+    def get_latest_run(self, dataset_id: int | None = None) -> dict | None:
+        """Return metadata for the most recent analysis run, optionally filtered by dataset ID."""
+        query = "SELECT * FROM analysis_runs"
+        params = []
+        if dataset_id is not None:
+            # Se passi l'ID del run, la colonna nella tabella 'analysis_runs' probabilmente è 'id'
+            query += " WHERE id = ?"
+            params.append(dataset_id)
+        query += " ORDER BY id DESC LIMIT 1"
+
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM analysis_runs ORDER BY id DESC LIMIT 1"
-            ).fetchone()
+            row = conn.execute(query, params).fetchone()
         if row is None:
             return None
         d = dict(row)
@@ -337,27 +343,34 @@ class DimuonStore:
                 d[key] = json.loads(d[key])
         return d
 
-    def get_stats(self) -> dict:
-        """Return aggregate statistics for the latest run."""
-        with self._connect() as conn:
-            row = conn.execute(
-                """
-                SELECT
-                    COUNT(*)                            AS total,
-                    SUM(z_candidate)                    AS z_total,
-                    AVG(invariant_mass)                 AS mass_mean,
-                    MIN(invariant_mass)                 AS mass_min,
-                    MAX(invariant_mass)                 AS mass_max,
-                    AVG(CASE WHEN z_candidate=1
-                             THEN invariant_mass END)   AS z_mass_mean,
-                    AVG(pt1)                            AS pt1_mean,
-                    AVG(pt2)                            AS pt2_mean
-                FROM events
-                WHERE run_id = (SELECT MAX(id) FROM analysis_runs)
-                """
-            ).fetchone()
+    def get_stats(self, dataset_id: int | None = None) -> dict:
+        """Return aggregate statistics for a specific dataset run."""
+        subquery = "SELECT MAX(id) FROM analysis_runs"
+        params = []
+        if dataset_id is not None:
+            # Anche qui cerchiamo il run per 'id'
+            subquery += " WHERE id = ?"
+            params.append(dataset_id)
 
-        if row is None:
+        query = f"""
+            SELECT
+                COUNT(*)                            AS total,
+                SUM(z_candidate)                    AS z_total,
+                AVG(invariant_mass)                 AS mass_mean,
+                MIN(invariant_mass)                 AS mass_min,
+                MAX(invariant_mass)                 AS mass_max,
+                AVG(CASE WHEN z_candidate=1
+                         THEN invariant_mass END)   AS z_mass_mean,
+                AVG(pt1)                            AS pt1_mean,
+                AVG(pt2)                            AS pt2_mean
+            FROM events
+            WHERE run_id = ({subquery})
+        """
+
+        with self._connect() as conn:
+            row = conn.execute(query, params).fetchone()
+
+        if row is None or row["total"] == 0:
             return {}
 
         return {

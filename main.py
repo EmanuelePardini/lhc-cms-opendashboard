@@ -34,7 +34,7 @@ def sub(label: str, value) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="LHC Open Dashboard — full pipeline test")
-    ap.add_argument("--dataset", default="dimuon_run2010b", choices=list(DATASETS.keys()))
+    ap.add_argument("--dataset", default="dimuon_run2011a", choices=list(DATASETS.keys()))
     ap.add_argument("--config", default="config/pipeline.yaml")
     ap.add_argument("--max-rows", type=int, default=None,
                     help="Limit rows parsed (None = all). Use 5000 for fast test.")
@@ -135,8 +135,7 @@ def main() -> None:
     t0 = time.perf_counter()
     run_id = store.save_analysis(
         result,
-        dataset_name=args.dataset,
-        recreate=cfg["storage"].get("recreate_on_run", True),
+        dataset_name=args.dataset
     )
     elapsed = time.perf_counter() - t0
     sub("run_id", run_id)

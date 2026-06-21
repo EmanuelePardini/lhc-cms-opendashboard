@@ -265,9 +265,9 @@ class DimuonCSVParser:
         self.warn_on_mismatch = warn_on_mismatch
 
     def to_dataframe(
-        self,
-        csv_path: str | Path,
-        max_rows: int | None = None,
+            self,
+            csv_path: str | Path,
+            max_rows: int | None = None,
     ) -> pd.DataFrame:
         """
         Parse CSV into a pandas DataFrame with all original columns plus
@@ -284,21 +284,34 @@ class DimuonCSVParser:
         path = Path(csv_path)
         logger.info("Reading CSV: %s", path)
 
+        # Read the raw CSV file
         df = pd.read_csv(
             path,
             nrows=max_rows,
-            dtype={
-                "Run": int, "Event": int,
-                "Type1": str, "Type2": str,
-                "Q1": int, "Q2": int,
-            },
         )
 
+        # 1. Clean whitespace and normalize column case
         df.columns = df.columns.str.strip()
 
+        # Map lowercase CSV columns to the expected CamelCase format.
+        # This ensures cross-compatibility between Run 2010 (Type1) and Run 2011 (type1).
+        column_mapping = {col.lower(): col for col in EXPECTED_COLUMNS}
+        df = df.rename(columns=lambda c: column_mapping.get(c.lower(), c))
+
+        # 2. Validation (columns will now have the correct case if they exist)
         self._validate_columns(df)
 
-        # Strip whitespace from string columns (some CERN CSVs have spaces)
+        # 3. Enforce proper data types after renaming
+        type_fix = {
+            "Run": int, "Event": int,
+            "Type1": str, "Type2": str,
+            "Q1": int, "Q2": int,
+        }
+        # Only convert columns that are actually present to prevent unexpected KeyErrors
+        type_fix = {k: v for k, v in type_fix.items() if k in df.columns}
+        df = df.astype(type_fix)
+
+        # Strip whitespace from string values (some CERN datasets contain padded spaces)
         df["Type1"] = df["Type1"].str.strip()
         df["Type2"] = df["Type2"].str.strip()
 
@@ -307,7 +320,7 @@ class DimuonCSVParser:
         px_sum = df["px1"] + df["px2"]
         py_sum = df["py1"] + df["py2"]
         pz_sum = df["pz1"] + df["pz2"]
-        m2 = e_sum**2 - (px_sum**2 + py_sum**2 + pz_sum**2)
+        m2 = e_sum ** 2 - (px_sum ** 2 + py_sum ** 2 + pz_sum ** 2)
         df["M_derived"] = np.sqrt(np.maximum(m2, 0.0))
 
         if self.warn_on_mismatch:
@@ -321,21 +334,21 @@ class DimuonCSVParser:
                     n_bad, self.mass_tolerance * 100,
                 )
 
-        # Derived: ΔR
+        # Derived: ΔR angular separation
         d_phi = df["phi1"] - df["phi2"]
         d_phi = (d_phi + np.pi) % (2 * np.pi) - np.pi
-        df["delta_r"] = np.sqrt((df["eta1"] - df["eta2"])**2 + d_phi**2)
+        df["delta_r"] = np.sqrt((df["eta1"] - df["eta2"]) ** 2 + d_phi ** 2)
 
-        # Quality flags
+        # Quality and selection flags
         df["opp_sign"] = (df["Q1"] * df["Q2"]) == -1
         df["any_global"] = (df["Type1"] == "G") | (df["Type2"] == "G")
         df["in_accept"] = (
-            (df["eta1"].abs() < ETA_MAX) & (df["eta2"].abs() < ETA_MAX)
-            & (df["pt1"] > PT_MIN_GEV) & (df["pt2"] > PT_MIN_GEV)
+                (df["eta1"].abs() < ETA_MAX) & (df["eta2"].abs() < ETA_MAX)
+                & (df["pt1"] > PT_MIN_GEV) & (df["pt2"] > PT_MIN_GEV)
         )
         df["z_candidate"] = (
-            df["opp_sign"] & df["any_global"] & df["in_accept"]
-            & df["M"].between(Z_WINDOW_LOW_GEV, Z_WINDOW_HIGH_GEV)
+                df["opp_sign"] & df["any_global"] & df["in_accept"]
+                & df["M"].between(Z_WINDOW_LOW_GEV, Z_WINDOW_HIGH_GEV)
         )
 
         n_total = len(df)

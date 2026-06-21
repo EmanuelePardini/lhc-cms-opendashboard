@@ -10,7 +10,7 @@ export function initScene(canvas, eventData) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(W, H, false);
-  renderer.setClearColor(0x000000, 0);
+  renderer.setClearColor(0xf2f4f8, 1);
 
   const scene = new THREE.Scene();
   scene.add(new THREE.AmbientLight(0x0a1830, 4));

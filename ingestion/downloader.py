@@ -91,7 +91,7 @@ DATASETS: dict[str, DatasetInfo] = {
     ),
 }
 
-DEFAULT_DATASET = "dimuon_run2010b"
+DEFAULT_DATASET = "dimuon_run2011a"
 
 
 class CERNOpenDataDownloader:

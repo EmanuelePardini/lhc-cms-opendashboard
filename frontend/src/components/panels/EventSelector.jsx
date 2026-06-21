@@ -3,9 +3,7 @@ import { fmt } from "../../utils/physics";
 
 export function EventSelector({ events, selected, loading, page, hasMore, zOnly, onSelect, onRefresh, onNext, onPrev, onToggleZOnly }) {
   return (
-    <div className="panel panel--events">
-      <div className="panel-label">Collision Events</div>
-
+    <div style={{ width: 260 }}>
       <div className="events__filter-row">
         <span className="events__filter-label">Filter</span>
         <button
@@ -14,7 +12,12 @@ export function EventSelector({ events, selected, loading, page, hasMore, zOnly,
         >
           Z Boson only
         </button>
-        <button className="btn-toggle" onClick={() => onRefresh(page, zOnly)} disabled={loading} style={{ marginLeft: "auto" }}>
+        <button
+          className="btn-toggle"
+          onClick={() => onRefresh(page, zOnly)}
+          disabled={loading}
+          style={{ marginLeft: "auto" }}
+        >
           ↻
         </button>
       </div>
@@ -36,32 +39,15 @@ export function EventSelector({ events, selected, loading, page, hasMore, zOnly,
             </div>
           </div>
         ))}
-
         {events.length === 0 && !loading && (
-          <div className="event-list__empty">Nessun evento trovato</div>
+          <div className="event-list__empty">No events found</div>
         )}
       </div>
 
       <div className="pagination">
-        <button
-          className="pagination__btn"
-          onClick={onPrev}
-          disabled={page === 0 || loading}
-        >
-          ‹
-        </button>
-
-        <span className="pagination__label">
-          {loading ? "…" : `Pag. ${page + 1}`}
-        </span>
-
-        <button
-          className="pagination__btn"
-          onClick={onNext}
-          disabled={!hasMore || loading}
-        >
-          ›
-        </button>
+        <button className="pagination__btn" onClick={onPrev} disabled={page === 0 || loading}>‹</button>
+        <span className="pagination__label">{loading ? "…" : `Page ${page + 1}`}</span>
+        <button className="pagination__btn" onClick={onNext} disabled={!hasMore || loading}>›</button>
       </div>
     </div>
   );

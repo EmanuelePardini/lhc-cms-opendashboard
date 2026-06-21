@@ -1,0 +1,85 @@
+.draggable-panel {
+  position: absolute;
+  background: #ffffff;
+  border: 1px solid #d8dde6;
+  border-top: 3px solid #0033a0;
+  box-shadow: 0 1px 3px rgba(0, 31, 102, 0.08);
+  font-family: "Inter", sans-serif;
+  z-index: 10;
+  min-width: 200px;
+  user-select: none;
+  transition: box-shadow 0.15s;
+}
+
+.draggable-panel--dragging {
+  box-shadow: 0 8px 24px rgba(0, 31, 102, 0.18);
+  z-index: 100;
+  transition: none;
+}
+
+/* Docking glow */
+.docked--left   { border-left:   3px solid #0033a0; }
+.docked--right  { border-right:  3px solid #0033a0; }
+.docked--bottom { border-bottom: 3px solid #0033a0; }
+
+/* Header / drag handle */
+.draggable-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: grab;
+  border-bottom: 1px solid #d8dde6;
+  background: #f7f9fc;
+}
+.draggable-panel__header:active { cursor: grabbing; }
+
+.draggable-panel__title {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #5b6472;
+}
+
+/* Toggle button */
+.panel__controls { display: flex; align-items: center; }
+
+.draggable-panel__toggle {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #d8dde6;
+  background: #ffffff;
+  color: #0033a0;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.12s, transform 0.2s;
+  /* Arrow points left = collapse */
+  transform: rotate(-90deg);
+}
+.draggable-panel__toggle--closed {
+  /* Arrow points right = expand */
+  transform: rotate(90deg);
+}
+.draggable-panel__toggle:hover { background: #e6ecf9; }
+
+/* Body */
+.draggable-panel__body {
+  padding: 16px 20px;
+  overflow: hidden;
+  max-height: 600px;
+  transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+  opacity: 1;
+}
+.draggable-panel__body--hidden {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+}
