@@ -16,18 +16,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-@app.get("/debug")
-def debug():
-    import os
-    from pathlib import Path
-    root = Path(__file__).resolve().parent.parent
-    return {
-        "root": str(root),
-        "config_exists": (root / "config" / "pipeline.yaml").exists(),
-        "config_dir_exists": (root / "config").exists(),
-        "config_dir_contents": os.listdir(root / "config") if (root / "config").exists() else "DIR NOT FOUND",
-        "root_contents": os.listdir(root),
-    }
 
 # Route mounting
 app.include_router(events.router)
