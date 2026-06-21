@@ -1,0 +1,36 @@
+.play-btn {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: #0033a0;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  box-shadow: 0 2px 8px rgba(0, 31, 102, 0.25);
+}
+.play-btn:hover:not(:disabled)  { background: #002577; }
+.play-btn:active:not(:disabled) { transform: translateX(-50%) translateY(1px); }
+
+.play-btn--playing  { background: #8a0000; }
+.play-btn--playing:hover:not(:disabled) { background: #600000; }
+
+.play-btn--disabled {
+  background: #5b6472;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.play-btn__icon  { font-size: 13px; line-height: 1; }
+.play-btn__label { line-height: 1; }

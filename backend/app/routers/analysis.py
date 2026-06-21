@@ -9,21 +9,27 @@ router = APIRouter(tags=["Analysis Engine"])
 
 
 @router.get("/histogram/mass", response_model=HistogramResponse)
-def get_invariant_mass_histogram(store: DimuonStore = Depends(get_store)):
-    """Retrieves structural distribution array counts of the overall dimuon mass spectrum."""
-    hist_data = store.get_histogram(name="mass_spectrum")
+def get_invariant_mass_histogram(
+        dataset_id: int = None,
+        store: DimuonStore = Depends(get_store)
+):
+    """
+    Recupera l'istogramma. Se run_id è omesso, lo store
+    recupererà automaticamente quello dell'ultimo run.
+    """
+    hist_data = store.get_histogram(name="mass_spectrum", run_id=dataset_id)
+
     if not hist_data:
         raise HTTPException(
             status_code=404,
-            detail="The invariant mass spectrum distribution payload is unavailable or has not been computed yet."
+            detail=f"Istogramma non trovato per run_id={dataset_id or 'ultimo'}"
         )
 
     return HistogramResponse(
         bin_centers=hist_data["bin_centers"],
         counts=hist_data["counts"],
-        name="mass_spectrum"
+        name=f"mass_spectrum_{dataset_id or 'latest'}"
     )
-
 
 @router.get("/stats", response_model=PipelineStatsResponse)
 def get_aggregated_pipeline_statistics(

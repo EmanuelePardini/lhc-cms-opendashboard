@@ -44,13 +44,13 @@ export function EventInfo({ event }) {
 
       <SectionDivider label="Muon 1" color="#c0392b" />
       <InfoRow label="Momentum pT" value={`${fmt(event.pt1)} GeV/c`} color="#c0392b" />
-      <InfoRow label="Direction η" value={fmt(event.eta1, 3)} />
+      <InfoRow label="Direction Eta" value={fmt(event.eta1, 3)} />
       <InfoRow label="Charge"      value={event.q1 > 0 ? "+1" : "−1"} />
       <InfoRow label="Reco type"   value={recoTypeLabel(event.type1)} />
 
       <SectionDivider label="Muon 2" color="#0077b6" />
       <InfoRow label="Momentum pT" value={`${fmt(event.pt2)} GeV/c`} color="#0077b6" />
-      <InfoRow label="Direction η" value={fmt(event.eta2, 3)} />
+      <InfoRow label="Direction Eta" value={fmt(event.eta2, 3)} />
       <InfoRow label="Charge"      value={event.q2 > 0 ? "+1" : "−1"} />
       <InfoRow label="Reco type"   value={recoTypeLabel(event.type2)} />
     </div>

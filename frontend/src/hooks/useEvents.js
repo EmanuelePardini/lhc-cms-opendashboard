@@ -13,6 +13,8 @@ export function useEvents() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [zOnly, setZOnly] = useState(false);
+  const [histogram, setHistogram] = useState(null);
+  const [loadingHistogram, setLoadingHistogram] = useState(false);
 
   //  Datasets
   const [allDatasets, setAllDatasets] = useState([]);
@@ -22,6 +24,7 @@ export function useEvents() {
   const [query, setQuery] = useState("");
   const [globalConfig, setGlobalConfig] = useState(null);
   const [configLoading, setConfigLoading] = useState(false);
+
 
   //Fetch config
   const fetchGlobalConfig = useCallback(async () => {
@@ -102,6 +105,28 @@ export function useEvents() {
     [],
   );
 
+  const fetchHistogram = useCallback(async (datasetId = null) => {
+    setLoadingHistogram(true);
+    try {
+      // Costruiamo la query string se dataset_id è definito
+      const params = new URLSearchParams();
+      if (datasetId !== null && datasetId !== undefined) {
+        params.append("dataset_id", datasetId);
+      }
+
+      const response = await fetch(`${API_BASE}/histogram/mass?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch mass spectrum");
+      
+      const data = await response.json();
+      setHistogram(data); // Payload: { bin_centers: [...], counts: [...], name: "..." }
+    } catch (err) {
+      console.error("Error retrieving live histogram:", err);
+      setHistogram(null); // Fallback automatico in caso di errore
+    } finally {
+      setLoadingHistogram(false);
+    }
+  }, []);
+
   //  Fetch stats
   const fetchStats = useCallback(async (datasetId = null, onFailure = null) => {
     try {
@@ -157,6 +182,9 @@ export function useEvents() {
     nextPage,
     prevPage,
     toggleZOnly,
+    histogram, 
+    fetchHistogram,
+    
     // datasets
     datasets,
     activeDatasetId,
@@ -166,7 +194,8 @@ export function useEvents() {
     query,
     setQuery,
     fetchDatasets,
-    //config
+
+    // config
     fetchGlobalConfig,
     globalConfig,
     configLoading

@@ -1,9 +1,10 @@
 import * as THREE from "three";
-import { buildDetector } from "./buildDetector";
-import { buildTracks }   from "./buildTracks";
-import { buildCamera }   from "./buildCamera";
+import { buildDetector }  from "./buildDetector";
+import { buildTracks }    from "./buildTracks";
+import { buildCamera }    from "./buildCamera";
+import { buildAnimation } from "./buildAnimation";
 
-export function initScene(canvas, eventData) {
+export function initScene(canvas, eventData, animationRef) {
   const W = canvas.clientWidth  || 800;
   const H = canvas.clientHeight || 600;
 
@@ -19,7 +20,31 @@ export function initScene(canvas, eventData) {
   scene.add(dLight);
 
   const { group: detectorGroup, glow: beamGlow } = buildDetector(scene);
-  buildTracks(scene, eventData);
+
+  // Static tracks (shown when not animating)
+  const staticTracks = buildTracks(scene, eventData);
+
+  // Animation layer (hidden until Play is pressed)
+  let anim = { update: () => {}, dispose: () => {} };
+
+  // Expose controls to the outside via ref
+  if (animationRef) {
+    animationRef.current = {
+      startAnimation: () => {
+        // Hide static tracks
+        staticTracks.visible = false;
+        // Build fresh animation group
+        anim.dispose();
+        anim = buildAnimation(scene, eventData);
+      },
+      stopAnimation: () => {
+        anim.dispose();
+        anim = { update: () => {}, dispose: () => {} };
+        staticTracks.visible = true;
+      },
+    };
+  }
+
   const { camera, tick: cameraTick, resize, destroy: destroyCamera } = buildCamera(canvas);
 
   const clock = new THREE.Clock();
@@ -32,6 +57,10 @@ export function initScene(canvas, eventData) {
     beamGlow.material.opacity = 0.3 + 0.22 * Math.sin(t * 4.5);
     detectorGroup.rotation.z  = t * 0.035;
     cameraTick();
+
+    // Drive animation frame if active
+    anim.update(t);
+
     renderer.render(scene, camera);
   };
   tick();
@@ -44,6 +73,7 @@ export function initScene(canvas, eventData) {
 
   return () => {
     alive = false;
+    anim.dispose();
     destroyCamera();
     window.removeEventListener("resize", handleResize);
     renderer.dispose();
