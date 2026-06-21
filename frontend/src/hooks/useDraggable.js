@@ -24,11 +24,14 @@ function snapToDock(x, y, w, h, vw, vh) {
 }
 
 export function useDraggable(id, initialPos) {
-  const [pos,       setPos]       = useState(initialPos);
+  const [pos,        setPos]        = useState(initialPos);
   const [isDragging, setIsDragging] = useState(false);
-  const [docks,     setDocks]     = useState({});
+  const [docks,      setDocks]      = useState({});
   const ref        = useRef(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const posRef     = useRef(pos);
+
+  useEffect(() => { posRef.current = pos; }, [pos]);
 
   // Persist position
   useEffect(() => {
@@ -38,6 +41,7 @@ export function useDraggable(id, initialPos) {
     }
   }, [id]);
 
+  //  Mouse 
   const onMouseDown = useCallback(e => {
     if (e.target.closest(".panel__controls")) return;
     e.preventDefault();
@@ -52,19 +56,14 @@ export function useDraggable(id, initialPos) {
     const onMouseMove = e => {
       const el = ref.current;
       if (!el) return;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const w  = el.offsetWidth;
-      const h  = el.offsetHeight;
-
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const w  = el.offsetWidth,   h  = el.offsetHeight;
       const rawX = e.clientX - dragOffset.current.x;
       const rawY = e.clientY - dragOffset.current.y;
-
       const clamped = {
         x: Math.max(0, Math.min(rawX, vw - w)),
         y: Math.max(HEADER_HEIGHT, Math.min(rawY, vh - h)),
       };
-
       const { x, y, docks: d } = snapToDock(clamped.x, clamped.y, w, h, vw, vh);
       setPos({ x, y });
       setDocks(d);
@@ -72,7 +71,7 @@ export function useDraggable(id, initialPos) {
 
     const onMouseUp = () => {
       setIsDragging(false);
-      localStorage.setItem(`panel-pos-${id}`, JSON.stringify(pos));
+      localStorage.setItem(`panel-pos-${id}`, JSON.stringify(posRef.current));
     };
 
     window.addEventListener("mousemove", onMouseMove);
@@ -81,7 +80,52 @@ export function useDraggable(id, initialPos) {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup",   onMouseUp);
     };
-  }, [isDragging, id, pos]);
+  }, [isDragging, id]);
+
+  //  Touch 
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const onTouchStart = e => {
+      if (e.target.closest(".panel__controls")) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect  = el.getBoundingClientRect();
+      dragOffset.current = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+      setIsDragging(true);
+    };
+
+    const onTouchMove = e => {
+      if (e.cancelable) e.preventDefault();
+      const touch = e.touches[0];
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const w  = el.offsetWidth,   h  = el.offsetHeight;
+      const rawX = touch.clientX - dragOffset.current.x;
+      const rawY = touch.clientY - dragOffset.current.y;
+      const clamped = {
+        x: Math.max(0, Math.min(rawX, vw - w)),
+        y: Math.max(HEADER_HEIGHT, Math.min(rawY, vh - h)),
+      };
+      const { x, y, docks: d } = snapToDock(clamped.x, clamped.y, w, h, vw, vh);
+      setPos({ x, y });
+      setDocks(d);
+    };
+
+    const onTouchEnd = () => {
+      setIsDragging(false);
+      localStorage.setItem(`panel-pos-${id}`, JSON.stringify(posRef.current));
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove",  onTouchMove,  { passive: false });
+    el.addEventListener("touchend",   onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove",  onTouchMove);
+      el.removeEventListener("touchend",   onTouchEnd);
+    };
+  }, [id]);
 
   return { ref, pos, isDragging, docks, onMouseDown };
 }

@@ -1,3 +1,4 @@
+import logging
 import sys
 from pathlib import Path
 from pipeline.store import DimuonStore
@@ -6,8 +7,14 @@ from pipeline.analysis import load_config
 # Resolve Monorepo Root Directory (lhc-stream-platform/)
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
-
 CONFIG_PATH = ROOT / "config" / "pipeline.yaml"
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.info(f"__file__    = {__file__}")
+logger.info(f"ROOT        = {ROOT}")
+logger.info(f"CONFIG_PATH = {CONFIG_PATH}")
+logger.info(f"EXISTS      = {CONFIG_PATH.exists()}")
 
 _config_cache = None
 _store_instance = None

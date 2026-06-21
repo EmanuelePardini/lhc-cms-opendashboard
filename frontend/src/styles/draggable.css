@@ -9,6 +9,7 @@
   min-width: 200px;
   user-select: none;
   transition: box-shadow 0.15s;
+  touch-action: none;
 }
 
 .draggable-panel--dragging {
@@ -82,4 +83,12 @@
   padding-top: 0;
   padding-bottom: 0;
   opacity: 0;
+}
+
+@media (pointer: coarse) {
+  .draggable-panel { min-width: 260px; }
+  .draggable-panel__header { padding: 14px 16px; min-height: 52px; }
+  .draggable-panel__title { font-size: 10px; }
+  .draggable-panel__toggle { width: 36px; height: 36px; font-size: 18px; border-radius: 6px; }
+  .draggable-panel__body { padding: 20px 16px; }
 }
