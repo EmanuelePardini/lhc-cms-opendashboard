@@ -1,5 +1,6 @@
 # LHC CMS Open Dashboard
 
+▶️ **[Visit the live demo](https://www.lhc-cms-opendashboard-fe.onrender.com)**
 A complete pipeline from data ingestion to 3D visualization  for analyzing real **dimuon** collision events recorded by the **CMS** experiment at the Large Hadron Collider (CERN), published on the [CERN Open Data Portal](https://opendata.cern.ch/).
 
 The project downloads the public datasets, applies the kinematic selection cuts typical of a particle physics analysis, fits the **Z⁰ boson** mass peak, stores the results in SQLite, exposes them through a REST API (FastAPI), and makes them explorable in an interactive 3D viewer (React + Three.js) that reconstructs the detector and the particle tracks.
