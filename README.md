@@ -1,6 +1,6 @@
 # LHC CMS Open Dashboard
 
-▶️ **[Visit the live demo](https://www.lhc-cms-opendashboard-fe.onrender.com)**
+▶️ **[Visit the live demo](https://lhc-cms-opendashboard-fe.onrender.com)**
 
 A complete pipeline from data ingestion to 3D visualization  for analyzing real **dimuon** collision events recorded by the **CMS** experiment at the Large Hadron Collider (CERN), published on the [CERN Open Data Portal](https://opendata.cern.ch/).
 
