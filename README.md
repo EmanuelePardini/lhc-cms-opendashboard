@@ -1,4 +1,4 @@
-# LHC CMS Open Dashboard
+# LHC CMS Open Dashboard 
 
 ▶️ **[Visit the live demo](https://lhc-cms-opendashboard-fe.onrender.com)**
 
